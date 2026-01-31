@@ -5,6 +5,8 @@ import (
 	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/common-nighthawk/go-figure"
 )
 
 type model struct {
@@ -12,6 +14,8 @@ type model struct {
 	shortRestTime int
 	longeRestTime int
 	workTime      int
+	width         int
+	height        int
 }
 
 func (m model) Init() tea.Cmd {
@@ -20,6 +24,9 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -36,7 +43,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return "Hello World!"
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			Title(),
+		),
+	)
+}
+
+func Title() string {
+	title := figure.NewFigure("POMODOGO", "", true).String()
+	return lipgloss.NewStyle().Bold(true).Render(title)
 }
 
 func main() {
