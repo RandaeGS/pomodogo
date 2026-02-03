@@ -12,11 +12,10 @@ import (
 )
 
 type model struct {
-	isRunning     bool
+	isWorking     bool
 	shortRestTime int
 	longeRestTime int
 	workTime      int
-	remainingTime int
 	timer         timer.Model
 	width         int
 	height        int
@@ -44,6 +43,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case timer.TimeoutMsg:
 		exec.Command("notify-send", "Finished").Run()
+		m.isWorking = !m.isWorking
+		m.timer = timer.NewWithInterval(time.Duration(time.Second*3), time.Second)
+		return m, m.timer.Stop()
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -56,8 +58,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
-			log.Println(m.timer.Running())
-			m.isRunning = !m.isRunning
 			return m, m.timer.Toggle()
 
 		}
@@ -66,38 +66,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return lipgloss.Place(
-		m.width,
-		m.height,
-		lipgloss.Center,
-		lipgloss.Center,
-		lipgloss.JoinVertical(
+	backgroundColor := lipgloss.Color("#AA2B1D")
+	if !m.isWorking {
+		backgroundColor = lipgloss.Color("#088395")
+	}
+	return lipgloss.NewStyle().Background(backgroundColor).Render(
+		lipgloss.Place(
+			m.width,
+			m.height,
 			lipgloss.Center,
-			Title(),
-			m.Timer(),
+			lipgloss.Center,
+			lipgloss.JoinVertical(
+				lipgloss.Center,
+				Title(),
+				m.Timer(),
+			),
 		),
 	)
 }
 
 func (m model) Timer() string {
-	timer := figure.NewFigure(m.timer.View(), "", true).String()
+	timer := figure.NewFigure(m.timer.View(), "larry3d", true).String()
 	return lipgloss.NewStyle().AlignVertical(lipgloss.Center).Render(timer)
 }
 
 func Title() string {
-	title := figure.NewFigure("POMODOGO", "", true).String()
-	return lipgloss.NewStyle().Bold(true).Render(title)
+	title := figure.NewFigure("POMODOGO", "larry3d", true).String()
+	return lipgloss.NewStyle().AlignVertical(lipgloss.Center).Render(title)
 }
 
 func main() {
 	m := model{
-		isRunning:     false,
-		shortRestTime: 0,
-		longeRestTime: 0,
-		workTime:      0,
-		remainingTime: 0,
-		timer:         timer.NewWithInterval(time.Second*5, time.Second),
+		isWorking:     true,
+		shortRestTime: int(time.Minute * 5),
+		longeRestTime: int(time.Minute * 15),
+		workTime:      int(time.Minute * 25),
 	}
+	m.timer = timer.NewWithInterval(time.Duration(time.Second*5), time.Second)
 
 	f, err := tea.LogToFile("debug.log", "debug")
 	if err != nil {
