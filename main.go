@@ -70,6 +70,9 @@ func (m model) View() string {
 	if !m.isWorking {
 		backgroundColor = lipgloss.Color("#088395")
 	}
+	if m.timer.Running() {
+		backgroundColor = lipgloss.Color("#060c0d")
+	}
 	return lipgloss.NewStyle().Background(backgroundColor).Render(
 		lipgloss.Place(
 			m.width,
