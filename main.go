@@ -65,27 +65,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	backgroundColor := lipgloss.Color("#AA2B1D")
+	bg := lipgloss.Color("#AA2B1D")
 	if !m.isWorking {
-		backgroundColor = lipgloss.Color("#088395")
+		bg = lipgloss.Color("#088395")
 	}
 	if m.timer.Running() {
-		backgroundColor = lipgloss.Color("#060c0d")
+		bg = lipgloss.Color("#060c0d")
 	}
 
-	return lipgloss.NewStyle().Background(backgroundColor).Render(
-		lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			lipgloss.JoinVertical(
-				lipgloss.Center,
-				Title(),
-				m.Timer(),
-				m.helpView(),
-			),
-		),
+	// Main content: title + timer, centered horizontally and vertically
+	main := lipgloss.JoinVertical(
+		lipgloss.Center,
+		Title(),
+		m.Timer(),
+	)
+
+	mainCentered := lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height - 1).
+		Background(bg).
+		AlignHorizontal(lipgloss.Center).
+		AlignVertical(lipgloss.Center).
+		Render(main)
+
+	// Compose: main content + spacer + help at bottom
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		mainCentered,
+		m.helpView(),
 	)
 }
 
