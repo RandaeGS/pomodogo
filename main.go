@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -12,13 +14,16 @@ import (
 )
 
 type model struct {
-	isWorking     bool
-	shortRestTime int
-	longeRestTime int
-	workTime      int
-	timer         timer.Model
-	width         int
-	height        int
+	isWorking      bool
+	shortRestTime  int
+	shortRestCount int
+	longRestTime   int
+	longRestCount  int
+	workTime       int
+	timer          timer.Model
+	help           help.Model
+	width          int
+	height         int
 }
 
 func (m model) Init() tea.Cmd {
@@ -48,16 +53,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.timer.Stop()
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
+		switch {
+		case key.Matches(msg, DefaultKeyMap.Exit):
 			return m, tea.Quit
-		case " ":
-			err := exec.Command("notify-send", "Hello").Run()
-			if err != nil {
-				log.Fatal(err)
-			}
-			return m, nil
-		case "enter":
+		case key.Matches(msg, DefaultKeyMap.Toggle):
 			return m, m.timer.Toggle()
 
 		}
@@ -73,6 +72,7 @@ func (m model) View() string {
 	if m.timer.Running() {
 		backgroundColor = lipgloss.Color("#060c0d")
 	}
+
 	return lipgloss.NewStyle().Background(backgroundColor).Render(
 		lipgloss.Place(
 			m.width,
@@ -83,6 +83,7 @@ func (m model) View() string {
 				lipgloss.Center,
 				Title(),
 				m.Timer(),
+				m.helpView(),
 			),
 		),
 	)
@@ -98,12 +99,39 @@ func Title() string {
 	return lipgloss.NewStyle().AlignVertical(lipgloss.Center).Render(title)
 }
 
+func (m model) helpView() string {
+	base := lipgloss.NewStyle()
+	m.help.Styles = help.Styles{
+		Ellipsis:       base.Foreground(lipgloss.Color("240")),
+		ShortKey:       base.Foreground(lipgloss.Color("228")),
+		ShortDesc:      base.Foreground(lipgloss.Color("252")),
+		ShortSeparator: base.Foreground(lipgloss.Color("240")),
+		FullKey:        base.Foreground(lipgloss.Color("228")),
+		FullDesc:       base.Foreground(lipgloss.Color("252")),
+		FullSeparator:  base.Foreground(lipgloss.Color("240")),
+	}
+
+	bgStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#AA2B1D")).
+		Height(1).
+		AlignHorizontal(lipgloss.Center)
+
+	helpContent := m.help.View(DefaultKeyMap)
+
+	return bgStyle.Render("") + lipgloss.PlaceHorizontal(
+		m.width,
+		lipgloss.Center,
+		helpContent,
+	)
+}
+
 func main() {
 	m := model{
 		isWorking:     true,
 		shortRestTime: int(time.Minute * 5),
-		longeRestTime: int(time.Minute * 15),
+		longRestTime:  int(time.Minute * 15),
 		workTime:      int(time.Minute * 25),
+		help:          help.New(),
 	}
 	m.timer = timer.NewWithInterval(time.Duration(time.Second*5), time.Second)
 
