@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -22,6 +23,7 @@ type model struct {
 	workTime       int
 	timer          timer.Model
 	help           help.Model
+	progress       progress.Model
 	width          int
 	height         int
 }
@@ -40,6 +42,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.progress.Width = m.width / 2
 
 	case timer.StartStopMsg:
 		var cmd tea.Cmd
@@ -82,7 +85,7 @@ func (m model) View() string {
 
 	mainCentered := lipgloss.NewStyle().
 		Width(m.width).
-		Height(m.height - 1).
+		Height(m.height / 2).
 		Background(bg).
 		AlignHorizontal(lipgloss.Center).
 		AlignVertical(lipgloss.Center).
@@ -92,6 +95,7 @@ func (m model) View() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		mainCentered,
+		m.ProgressBar(bg),
 		m.helpView(),
 	)
 }
@@ -104,6 +108,22 @@ func (m model) Timer() string {
 func Title() string {
 	title := figure.NewFigure("POMODOGO", "larry3d", true).String()
 	return lipgloss.NewStyle().AlignVertical(lipgloss.Center).Render(title)
+}
+
+func (m model) ProgressBar(bg lipgloss.Color) string {
+	// percentage := 0.00
+	//
+	// if m.isWorking {
+	// 	percentage = m.timer.Timeout.Seconds() / float64(m.workTime)
+	// }
+
+	m.progress.Width = m.width / 2
+	progress := m.progress.ViewAs(m.timer.Timeout.Seconds() / 5)
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Background(bg).
+		AlignHorizontal(lipgloss.Center).
+		Render(progress)
 }
 
 func (m model) helpView() string {
@@ -139,8 +159,10 @@ func main() {
 		longRestTime:  int(time.Minute * 15),
 		workTime:      int(time.Minute * 25),
 		help:          help.New(),
+		progress:      progress.New(progress.WithDefaultGradient()),
 	}
 	m.timer = timer.NewWithInterval(time.Duration(time.Second*5), time.Second)
+	m.progress.ShowPercentage = true
 
 	f, err := tea.LogToFile("debug.log", "debug")
 	if err != nil {
