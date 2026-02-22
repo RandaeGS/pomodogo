@@ -88,7 +88,7 @@ func (m model) View() string {
 		Height(m.height / 2).
 		Background(bg).
 		AlignHorizontal(lipgloss.Center).
-		AlignVertical(lipgloss.Center).
+		AlignVertical(lipgloss.Bottom).
 		Render(main)
 
 	// Compose: main content + spacer + help at bottom
@@ -101,12 +101,12 @@ func (m model) View() string {
 }
 
 func (m model) Timer() string {
-	timer := figure.NewFigure(m.timer.View(), "larry3d", true).String()
+	timer := figure.NewFigure(m.timer.View(), "colossal", true).String()
 	return lipgloss.NewStyle().AlignVertical(lipgloss.Center).Render(timer)
 }
 
 func Title() string {
-	title := figure.NewFigure("POMODOGO", "larry3d", true).String()
+	title := figure.NewFigure("POMODOGO", "colossal", true).String()
 	return lipgloss.NewStyle().AlignVertical(lipgloss.Center).Render(title)
 }
 
@@ -121,6 +121,8 @@ func (m model) ProgressBar(bg lipgloss.Color) string {
 	progress := m.progress.ViewAs(m.timer.Timeout.Seconds() / 5)
 	return lipgloss.NewStyle().
 		Width(m.width).
+		Height((m.height - 1) / 2).
+		PaddingTop(5).
 		Background(bg).
 		AlignHorizontal(lipgloss.Center).
 		Render(progress)
@@ -162,7 +164,7 @@ func main() {
 		progress:      progress.New(progress.WithDefaultGradient()),
 	}
 	m.timer = timer.NewWithInterval(time.Duration(time.Second*5), time.Second)
-	m.progress.ShowPercentage = true
+	m.progress.ShowPercentage = false
 
 	f, err := tea.LogToFile("debug.log", "debug")
 	if err != nil {
