@@ -21,9 +21,11 @@ type model struct {
 	longRestTime   int
 	longRestCount  int
 	workTime       int
+	workCount      int
 	timer          timer.Model
 	help           help.Model
 	progress       progress.Model
+	activeDialog   tea.Model
 	width          int
 	height         int
 }
@@ -33,6 +35,29 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case SaveTimesMsg:
+		m.workTime = msg.Work
+		m.shortRestTime = msg.ShortRest
+		m.longRestTime = msg.LongRest
+		m.isWorking = true
+
+		m.timer = timer.NewWithInterval(time.Duration(m.workTime)*time.Second, time.Second)
+
+		m.activeDialog = nil
+		return m, m.timer.Init()
+
+	case QuitDialogMsg:
+		m.activeDialog = nil
+		return m, nil
+	}
+
+	if m.activeDialog != nil {
+		var cmd tea.Cmd
+		m.activeDialog, cmd = m.activeDialog.Update(msg)
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 	case timer.TickMsg:
 		var cmd tea.Cmd
@@ -50,9 +75,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case timer.TimeoutMsg:
-		exec.Command("notify-send", "Finished").Run()
-		m.isWorking = !m.isWorking
-		m.timer = timer.NewWithInterval(time.Duration(time.Second*3), time.Second)
+		m.UpdateCounts()
+		message := ""
+		if m.isWorking {
+			message = "Time to work!"
+			m.timer = timer.NewWithInterval(time.Duration(time.Second*time.Duration(m.workTime)), time.Second)
+		} else if !m.isWorking && m.workCount%4 != 0 || m.workCount == 0 {
+			message = "Time to take a short rest!"
+			m.timer = timer.NewWithInterval(time.Duration(time.Second*time.Duration(m.shortRestTime)), time.Second)
+		} else if !m.isWorking && m.workCount%4 == 0 && m.workCount != 0 {
+			message = "Time to take a long rest!"
+			m.timer = timer.NewWithInterval(time.Duration(time.Second*time.Duration(m.longRestTime)), time.Second)
+		}
+
+		exec.Command("notify-send", message).Run()
 		return m, m.timer.Stop()
 
 	case tea.KeyMsg:
@@ -62,12 +98,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, DefaultKeyMap.Toggle):
 			return m, m.timer.Toggle()
 
+		case key.Matches(msg, DefaultKeyMap.Settings):
+			if m.activeDialog == nil {
+				m.activeDialog = NewConfigDialog(
+					m.workTime,
+					m.shortRestTime,
+					m.longRestTime,
+					m.width,
+					m.height,
+				)
+				return m, m.activeDialog.Init()
+			}
 		}
 	}
 	return m, nil
 }
 
+func (m *model) UpdateCounts() {
+	if m.isWorking {
+		m.workCount++
+	} else if !m.isWorking && m.workCount%4 != 0 || m.workCount == 0 {
+		m.shortRestCount++
+	} else if !m.isWorking && m.workCount%4 == 0 && m.workCount != 0 {
+		m.longRestCount++
+	}
+	m.isWorking = !m.isWorking
+}
+
 func (m model) View() string {
+	if m.activeDialog != nil {
+		return m.activeDialog.View()
+	}
+
 	bg := lipgloss.Color("#AA2B1D")
 	if !m.isWorking {
 		bg = lipgloss.Color("#088395")
@@ -107,22 +169,25 @@ func (m model) Timer() string {
 
 func Title() string {
 	title := figure.NewFigure("POMODOGO", "colossal", true).String()
-	return lipgloss.NewStyle().AlignVertical(lipgloss.Center).Render(title)
+	return lipgloss.NewStyle().AlignVertical(lipgloss.Center).Padding(3).Render(title)
 }
 
 func (m model) ProgressBar(bg lipgloss.Color) string {
-	// percentage := 0.00
-	//
-	// if m.isWorking {
-	// 	percentage = m.timer.Timeout.Seconds() / float64(m.workTime)
-	// }
+	percentage := 0.00
+	if m.isWorking {
+		percentage = m.timer.Timeout.Seconds() / float64(m.workTime)
+	} else if !m.isWorking && m.workCount%4 != 0 || m.workCount == 0 {
+		percentage = m.timer.Timeout.Seconds() / float64(m.shortRestTime)
+	} else if !m.isWorking && m.workCount%4 == 0 && m.workCount != 0 {
+		percentage = m.timer.Timeout.Seconds() / float64(m.longRestTime)
+	}
 
 	m.progress.Width = m.width / 2
-	progress := m.progress.ViewAs(m.timer.Timeout.Seconds() / 5)
+	progress := m.progress.ViewAs(percentage)
 	return lipgloss.NewStyle().
 		Width(m.width).
 		Height((m.height - 1) / 2).
-		PaddingTop(5).
+		PaddingTop(3).
 		Background(bg).
 		AlignHorizontal(lipgloss.Center).
 		Render(progress)
@@ -156,14 +221,17 @@ func (m model) helpView() string {
 
 func main() {
 	m := model{
-		isWorking:     true,
-		shortRestTime: int(time.Minute * 5),
-		longRestTime:  int(time.Minute * 15),
-		workTime:      int(time.Minute * 25),
-		help:          help.New(),
-		progress:      progress.New(progress.WithDefaultGradient()),
+		isWorking:      true,
+		shortRestTime:  5 * 60,
+		shortRestCount: 0,
+		longRestTime:   15 * 60,
+		longRestCount:  0,
+		workTime:       25 * 60,
+		workCount:      0,
+		help:           help.New(),
+		timer:          timer.NewWithInterval(time.Duration(time.Minute*25), time.Second),
+		progress:       progress.New(progress.WithDefaultGradient()),
 	}
-	m.timer = timer.NewWithInterval(time.Duration(time.Second*5), time.Second)
 	m.progress.ShowPercentage = false
 
 	f, err := tea.LogToFile("debug.log", "debug")
