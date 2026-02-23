@@ -96,7 +96,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, DefaultKeyMap.Exit):
 			return m, tea.Quit
 		case key.Matches(msg, DefaultKeyMap.Toggle):
-			return m, m.timer.Toggle()
+			if m.timer.Running() {
+				return m, m.timer.Stop()
+			} else {
+				m.timer = timer.New(m.timer.Timeout)
+				return m, m.timer.Start()
+			}
 
 		case key.Matches(msg, DefaultKeyMap.Settings):
 			if m.activeDialog == nil {
